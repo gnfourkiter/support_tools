@@ -14,7 +14,7 @@
     <!-- Sidebar -->
     <div :class="['fixed top-0 left-0 h-full w-60 bg-blue-500 text-white transform transition-transform duration-300 z-40', sidebarOpen ? 'translate-x-0' : '-translate-x-full']">
       <div class="p-4">
-        <h2 class="text-lg font-bold">Welcome, </h2>
+        <h2 class="text-lg font-bold">Hello Everyone, </h2>
         <ul class="mt-4 space-y-2">
           <li v-for="item in menuItems" :key="item.key">
             <a href="#" 
@@ -190,9 +190,9 @@
           menuItems: [
             { key: 'data_related', label: 'String Manipulation' },
             { key: 'extract_cert', label: 'Extract Certificate' },
-            { key: 'about', label: 'About' },
-            { key: 'services', label: 'Services' },
-            { key: 'contact', label: 'Contact' }
+            // { key: 'about', label: 'About' },
+            // { key: 'services', label: 'Services' },
+            // { key: 'contact', label: 'Contact' }
           ],
           contentMap: {
             data_related: Data_Related, // Reference the Home component directly
@@ -209,15 +209,15 @@
                 </div>
               `
             },
-            about: {
-              template: '<h1 class="text-2xl font-bold">About</h1><p class="mt-2">Learn more about us here.</p>'
-            },
-            services: {
-              template: '<h1 class="text-2xl font-bold">Services</h1><p class="mt-2">These are the services we offer.</p>'
-            },
-            contact: {
-              template: '<h1 class="text-2xl font-bold">Contact</h1><p class="mt-2">Get in touch with us here.</p>'
-            }
+            // about: {
+            //   template: '<h1 class="text-2xl font-bold">About</h1><p class="mt-2">Learn more about us here.</p>'
+            // },
+            // services: {
+            //   template: '<h1 class="text-2xl font-bold">Services</h1><p class="mt-2">These are the services we offer.</p>'
+            // },
+            // contact: {
+            //   template: '<h1 class="text-2xl font-bold">Contact</h1><p class="mt-2">Get in touch with us here.</p>'
+            // }
           }
         };
       },
