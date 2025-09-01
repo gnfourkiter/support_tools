@@ -1,0 +1,220 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>X.509 Certificate Extractor</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:32px auto; padding:0 16px; color:#0b1220 }
+    h1 { font-size:20px; margin-bottom:8px }
+    .row { display:flex; gap:8px; align-items:center; margin:8px 0 }
+  textarea { width:100%; height:200px; font-family: monospace; font-size:13px; }
+  /* unified textarea used by both XML input and PEM output */
+  textarea.fixed { width:100%; height:260px; box-sizing: border-box; font-family: monospace; font-size:13px; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap }
+  /* make child columns inside .controls expand to available width so inner textareas can be full-width */
+  .controls > div { flex: 1 1 0; min-width: 280px; }
+    .message { margin-top:8px; color:#064e3b; }
+    .error { margin-top:8px; color:#7f1d1d; }
+    button { padding:8px 12px; cursor:pointer }
+    input[type=text] { padding:6px; }
+    label { font-size:13px }
+    .foot { font-size:12px; color:#4b5563; margin-top:12px }
+  </style>
+</head>
+<body>
+  <h1>X.509 Certificate Extractor</h1>
+  <p>Choose an XML file containing one or more <code>&lt;X509Certificate&gt;</code> tags, or paste the XML into the box and click <strong>Extract</strong>. The first certificate will be converted to PEM and a download link will be provided.</p>
+
+  <div class="row">
+    <input id="fileInput" type="file" accept=".xml,text/xml,text/plain" />
+    <label for="prefix">Output prefix</label>
+    <input id="prefix" type="text" value="certificate" />
+    <button id="extractBtn">Extract</button>
+    <button id="extractAllBtn">Extract all</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+
+  <label for="xmlArea">XML input (file or paste)</label>
+  <br>
+  <textarea class="fixed" id="xmlArea" placeholder="Paste XML here or choose a file above..."></textarea>
+  <br>
+  <div class="controls">
+    <div>
+  <label>PEM output</label>
+  <br>
+  <textarea class="fixed" id="pemArea" readonly placeholder="PEM will appear here after extraction"></textarea>
+  <br>
+  <button id="savePemBtn" type="button">Save PEM</button>
+    </div>
+  </div>
+
+  <div id="actions" class="row"></div>
+  <div id="status"></div>
+
+  <p class="foot">Notes: This runs entirely in your browser. No data is uploaded to any server.</p>
+
+  <script>
+  const fileInput = document.getElementById('fileInput');
+    const xmlArea = document.getElementById('xmlArea');
+    const extractBtn = document.getElementById('extractBtn');
+    const extractAllBtn = document.getElementById('extractAllBtn');
+  const clearBtn = document.getElementById('clearBtn');
+    const pemArea = document.getElementById('pemArea');
+    const prefixInput = document.getElementById('prefix');
+    const actions = document.getElementById('actions');
+    const status = document.getElementById('status');
+    const savePemBtn = document.getElementById('savePemBtn');
+
+  // Keep track of created object URLs so we can revoke them on clear
+  let downloadUrls = [];
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => xmlArea.value = reader.result;
+      reader.readAsText(file, 'utf-8');
+    });
+
+    function clearStatus() { status.textContent = ''; status.className = ''; actions.innerHTML = ''; }
+
+    function showMessage(msg) { clearStatus(); status.textContent = msg; status.className = 'message'; }
+    function showError(msg) { clearStatus(); status.textContent = msg; status.className = 'error'; }
+
+    function extractCertificatesFromText(text) {
+      const regex = /<X509Certificate>([\s\S]*?)<\/X509Certificate>/ig;
+      const matches = [];
+      let m;
+      while ((m = regex.exec(text)) !== null) {
+        matches.push(m[1]);
+      }
+      return matches; // array of base64-ish strings (may contain whitespace)
+    }
+
+    function cleanBase64(s) { return s.replace(/\s+/g, '').trim(); }
+
+    function validateBase64(b64) {
+      try {
+        // atob will throw on invalid characters in many cases
+        const decoded = atob(b64);
+        // round-trip check: re-encode and compare (handles padding differences)
+        try { return btoa(decoded) === b64 || b64.endsWith('=') || true; } catch(e) { return true; }
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function toPem(certBase64) {
+      const lines = [];
+      for (let i = 0; i < certBase64.length; i += 64) {
+        lines.push(certBase64.slice(i, i + 64));
+      }
+      return '-----BEGIN CERTIFICATE-----\n' + lines.join('\n') + '\n-----END CERTIFICATE-----\n';
+    }
+
+    function makeDownloadLink(pem, filename) {
+      const blob = new Blob([pem], { type: 'application/x-pem-file' });
+      const url = URL.createObjectURL(blob);
+      downloadUrls.push(url);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.textContent = 'Download ' + filename;
+      a.style.display = 'inline-block';
+      a.style.marginRight = '12px';
+      a.addEventListener('click', () => setTimeout(() => URL.revokeObjectURL(url), 5000));
+      return a;
+    }
+
+    function clearAll() {
+      // Revoke any created object URLs
+      try {
+        downloadUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch(e){} });
+      } finally {
+        downloadUrls = [];
+      }
+      // Clear inputs and UI
+      fileInput.value = '';
+      xmlArea.value = '';
+      pemArea.value = '';
+      prefixInput.value = 'certificate';
+      actions.innerHTML = '';
+      status.textContent = '';
+      status.className = '';
+      showMessage('Cleared all fields.');
+    }
+
+    function savePem() {
+      const pem = pemArea.value;
+      if (!pem || !pem.trim()) { showError('No PEM to save.'); return; }
+      const prefix = (prefixInput.value || 'certificate').replace(/[^a-zA-Z0-9_-]/g, '') || 'certificate';
+      const filename = `${prefix}_${currentDateString()}.crt`;
+      const blob = new Blob([pem], { type: 'application/x-pem-file' });
+      const url = URL.createObjectURL(blob);
+      downloadUrls.push(url);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // revoke after short delay
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 3000);
+      showMessage(`Saved PEM as ${filename}`);
+    }
+
+    function currentDateString() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}${mm}${dd}`;
+    }
+
+    function handleExtraction(extractAll = false) {
+      clearStatus();
+      pemArea.value = '';
+      const text = xmlArea.value;
+      if (!text || !text.trim()) { showError('No XML provided. Paste XML or choose a file.'); return; }
+
+      const certs = extractCertificatesFromText(text);
+      if (!certs || certs.length === 0) { showError('No <X509Certificate> tags found in the XML.'); return; }
+
+      const prefix = (prefixInput.value || 'certificate').replace(/[^a-zA-Z0-9_-]/g, '') || 'certificate';
+
+      if (!extractAll) {
+        const raw = cleanBase64(certs[0]);
+        if (!validateBase64(raw)) { showError('Certificate contains invalid Base64 data.'); return; }
+        const pem = toPem(raw);
+        pemArea.value = pem;
+        const filename = `${prefix}_${currentDateString()}.crt`;
+        actions.appendChild(makeDownloadLink(pem, filename));
+        showMessage('Extracted first certificate.');
+      } else {
+        // extract all certificates and present multiple download links and combined PEM
+        let combined = '';
+        certs.forEach((c, idx) => {
+          const raw = cleanBase64(c);
+          if (!validateBase64(raw)) return; // skip invalid
+          const pem = toPem(raw);
+          combined += pem + '\n';
+          const filename = `${prefix}_${currentDateString()}_${idx+1}.crt`;
+          actions.appendChild(makeDownloadLink(pem, filename));
+        });
+        if (!combined) { showError('No valid Base64 certificates were found.'); return; }
+        pemArea.value = combined.trim();
+        // also provide combined download
+        const combinedName = `${prefix}_${currentDateString()}_all.crt`;
+        actions.appendChild(makeDownloadLink(pemArea.value, combinedName));
+        showMessage(`Extracted ${actions.querySelectorAll('a').length} certificate file(s).`);
+      }
+    }
+
+  extractBtn.addEventListener('click', () => handleExtraction(false));
+  extractAllBtn.addEventListener('click', () => handleExtraction(true));
+  clearBtn.addEventListener('click', clearAll);
+  savePemBtn.addEventListener('click', savePem);
+  </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FourKites SPA Support Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <script src="https://unpkg.com/vue@3"></script>
+</head>
+<body class="flex h-screen bg-gray-100">
+
+  <div id="app" class="flex h-screen w-full">
+    <!-- Sidebar -->
+    <div :class="['fixed top-0 left-0 h-full w-60 bg-blue-500 text-white transform transition-transform duration-300 z-40', sidebarOpen ? 'translate-x-0' : '-translate-x-full']">
+      <div class="p-4">
+        <h2 class="text-lg font-bold">Welcome, </h2>
+        <ul class="mt-4 space-y-2">
+          <li v-for="item in menuItems" :key="item.key">
+            <a href="#" 
+               :class="['block px-4 py-2 rounded', selectedMenu === item.key ? 'bg-blue-400' : 'hover:bg-blue-400']" 
+               @click.prevent="selectMenu(item.key)">
+              {{ item.label }}
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div :class="['flex-1 p-4 transition-all duration-300', sidebarOpen ? 'ml-60' : 'ml-0']">
+      <!-- Button to toggle sidebar -->
+      <button @click="toggleSidebar" class="px-1.5 py-.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-transform" style="transform-origin: center;">
+        <i class="fa-solid fa-arrows-rotate active:rotate-180 transition-transform" :class="sidebarOpen"></i>
+      </button>
+
+      <div id="contentArea" class="mt-4">
+        <!-- Dynamically render the selected component -->
+        <component :is="contentMap[selectedMenu]"></component>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    const Data_Related = {
+      template:  `
+      <div class="w-5/6 mx-auto bg-white p-4 rounded shadow-md mt-4">
+        <h1 class="text-2xl font-bold text-blue-600 mb-3 content-center flex justify-center">Simple String Manipulation</h1>
+        <textarea id="entry_text" v-model="entryText" class="w-full h-72 p-2 border border-gray-300 rounded resize-none" placeholder="Enter your text here..."></textarea>
+        <div id="clear_button_entry" class="flex flex-row justify-end">
+          <button @click="clearTextEntry" class="mt-2 px-4 py-1 bg-blue-600/20 text-blue-600 border-2 border-blue-600 rounded hover:bg-blue-700 hover:text-white active:scale-95">
+            Clear Entry Text
+          </button>
+        </div>
+        <p class="mt-2">Please select one of the options here and click on run.</p>
+        <div class="flex flex-row justify-between items-center mt-1">
+          <div id="radio_buttons_container">
+            <radio-group class="mt-2">
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="both" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4" checked>
+                <span class="ml-2">Append+Prepend Character/s</span>
+              </label>
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="prepend" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4">
+                <span class="ml-2">Prepend Only</span> 
+              </label>
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="append" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4">
+                <span class="ml-2">Append Only</span>
+              </label>
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="no_line_breaks" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4">
+                <span class="ml-2">No Line Breaks</span>
+              </label>
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="replace_character" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4">
+                <span class="ml-2">Replace Character</span>
+              </label>
+              <label class="inline-flex items-center mr-4">
+                <input type="radio" name="option" value="split" v-model="selectedOption" class="form-radio text-blue-600 w-4 h-4">
+                <span class="ml-2">Split Text</span>
+              </label>
+            </radio-group>
+          </div>
+        </div>
+        <div id="character_input_container" class="mb-4 flex flex-row justify-between items-center mt-2">
+          <div id="character_spaces" class="flex flex-row gap-4">
+            <input id="character" v-model="character" type="text" placeholder="Character Space" class="w-75 h-10 p-2 border border-gray-300 rounded mt-2">
+            <input 
+              id="replacement_character" 
+              v-model="replacement_character" 
+              type="text" 
+              placeholder="Replacement Character Space" 
+              class="w-64 h-10 p-2 border border-gray-300 rounded mt-2" 
+              v-if="selectedOption === 'replace_character'"
+            >
+          </div>
+          <div id="run_button">
+            <button 
+              @click="processText" 
+              class="mt-2 px-4 py-1 bg-blue-600/20 text-blue-600 border-2 border-blue-600 rounded hover:bg-blue-700 hover:text-white active:scale-95">
+              Run
+            </button>
+          </div>
+        </div>
+        <textarea id="exit_text" v-model="exitText" class="w-full h-72 p-2 border border-gray-300 rounded resize-none" readonly></textarea>
+        <div id="last_row_buttons" class="flex flex-row justify-between items-center mt-2">
+          <div id="clear_all">
+            <button @click="clearAll" class="mt-2 px-4 py-1 bg-blue-600/20 text-blue-600 border-2 border-blue-600 rounded hover:bg-blue-700 hover:text-white active:scale-95">
+              Clear All
+            </button>
+          </div>
+          <div id="copy_button">
+            <button @click="copyAbove" class="mt-2 px-4 py-1 bg-blue-600/20 text-blue-600 border-2 border-blue-600 rounded hover:bg-blue-700 hover:text-white active:scale-95">
+              Copy Above to Text Entry Area
+            </button>
+          </div>
+        </div>
+      </div>
+      `,
+        data() {
+        return {
+          entryText: '',
+          exitText: '',
+          character: '',
+          selectedOption: 'both'
+        };
+      },
+      methods: {
+        processText() {
+          if (this.selectedOption === 'no_line_breaks') {
+            // Remove all line breaks without adding any character
+            this.exitText = this.entryText.replace(/\n/g, '');
+          } else if (this.selectedOption === 'replace_character') {
+            // Replace a specific character with the replacement character
+            if (this.character !== undefined && this.character !== null) {
+              const regex = new RegExp(this.character, 'g'); // Create a global regex for the character
+              this.exitText = this.entryText.replace(regex, this.replacement_character || ''); // Use empty string if replacement_character is empty
+            } else {
+              this.exitText = 'Please provide the character to replace.';
+            }
+          } else if (this.selectedOption === 'split') {
+            const splitChar = this.character || ' '; // Default to a single space if character is empty
+            const regex = new RegExp(splitChar, 'g'); // Create a global regex for the split character
+            this.exitText = this.entryText
+              .split(regex) // Split by the character
+              .map(line => line.trim()) // Trim spaces from each line
+              .join('\n')
+              .trim(); // Join with new lines
+          } else {
+            // Handle other cases (prepend, append, both)
+            const lines = this.entryText.split('\n');
+            const processedLines = lines.map(line => {
+              if (this.selectedOption === 'prepend') {
+                return this.character + line;
+              } else if (this.selectedOption === 'append') {
+                return line + this.character;
+              } else if (this.selectedOption === 'both') {
+                return this.character + line + this.character;
+              }
+              return line;
+            });
+            this.exitText = processedLines.join('\n');
+          }
+        },
+        copyAbove() {
+          const textarea = document.getElementById('exit_text');
+          textarea.select();
+          document.execCommand('copy');
+          this.entryText = this.exitText; // Update entryText with the content of exitText
+          alert('Text copied to clipboard and updated in the entry textarea!');
+        },
+        clearTextEntry() {
+          this.entryText = '';
+        },
+        clearAll() {
+          this.entryText = '';
+          this.exitText = '';
+          this.character = '';
+          this.selectedOption = 'both'; // Reset to default option
+        }
+      }
+    };
+
+    const app = Vue.createApp({
+      data() {
+        return {
+          sidebarOpen: false,
+          selectedMenu: 'data_related',
+          menuItems: [
+            { key: 'data_related', label: 'String Manipulation' },
+            { key: 'extract_cert', label: 'Extract Certificate' },
+            { key: 'about', label: 'About' },
+            { key: 'services', label: 'Services' },
+            { key: 'contact', label: 'Contact' }
+          ],
+          contentMap: {
+            data_related: Data_Related, // Reference the Home component directly
+            extract_cert: {
+              template: `
+                <div class="w-5/6 mx-auto mt-4 overflow-hidden">
+                  <div class="w-full bg-white p-0 rounded shadow-md overflow-hidden">
+                    <iframe src="extract_cert.html"
+                            style="display:block; width:100%; height:110vh; min-width:0; border:0; overflow:hidden;"
+                            scrolling="no"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
+                            title="Extract Certificate"></iframe>
+                  </div>
+                </div>
+              `
+            },
+            about: {
+              template: '<h1 class="text-2xl font-bold">About</h1><p class="mt-2">Learn more about us here.</p>'
+            },
+            services: {
+              template: '<h1 class="text-2xl font-bold">Services</h1><p class="mt-2">These are the services we offer.</p>'
+            },
+            contact: {
+              template: '<h1 class="text-2xl font-bold">Contact</h1><p class="mt-2">Get in touch with us here.</p>'
+            }
+          }
+        };
+      },
+      components: {
+        Data_Related // Register the Home component
+      },
+      methods: {
+        toggleSidebar() {
+          this.sidebarOpen = !this.sidebarOpen;
+        },
+        selectMenu(key) {
+          this.selectedMenu = key;
+        }
+      }
+    });
+  
+    app.mount('#app');
+  </script>
+
+</body>
+</html>
